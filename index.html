@@ -1073,7 +1073,7 @@
         var map = state === "minute" ? S.minute.still : (S[state].ready && !reduce ? S[state].vtex : S[state].poster);
         var alpha = state === "minute" ? S.minute.alpha : S[state].alpha;
         if (m.map !== map || m.alphaMap !== alpha){ m.map = map; m.alphaMap = alpha; m.needsUpdate = true; }
-        var litGoal = state === "idle" ? SLEEP_DIM : 1;
+        var litGoal = state === "idle" && focused !== idx ? SLEEP_DIM : 1;   // the room you zoomed into is always fully lit
         lit = reduce ? litGoal : lit + (litGoal - lit) * 0.05; m.color.setScalar(lit);
       };
     }
