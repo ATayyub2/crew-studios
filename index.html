@@ -1038,6 +1038,12 @@
     };
     var OVERVIEW_SCALE = 1, ACTIVE_SCALE = 1.15;   // rendered rooms have tall walls; drawn a little smaller in the overview so they hide less of the room behind
     var minuteUntil = {};   // room index -> time the "give me a minute" pose ends
+    // once the whole book is done the lights come back on and each agent drifts between working and resting at random
+    var crewDone = false, freeState = {}, freeUntil = {};
+    function freeStateOf(idx, now){
+      if (!freeUntil[idx] || now > freeUntil[idx]){ freeState[idx] = Math.random() < 0.5 ? "work" : "idle"; freeUntil[idx] = now + 6000 + Math.random() * 8000; }
+      return freeState[idx];
+    }
     function videoRoom(V, idx){
       var loader = new THREE.TextureLoader();
       function clip(prefix){
@@ -1068,12 +1074,13 @@
         right.set(1, 0, 0).applyQuaternion(camera.quaternion); up.set(0, 1, 0).applyQuaternion(camera.quaternion);
         plane.position.set(0, 0, 0).addScaledVector(right, V.ox * sc).addScaledVector(up, V.oy * sc);
         // working = this agent's turn in the pipeline; otherwise it is idle (asleep or tapping the table)
-        var state = (minuteUntil[idx] || 0) > performance.now() ? "minute" : active === idx ? "work" : (tagState[idx] === "ask" && S.ask) ? "ask" : "idle";
+        var now = performance.now();
+        var state = (minuteUntil[idx] || 0) > now ? "minute" : active === idx ? "work" : (tagState[idx] === "ask" && S.ask) ? "ask" : crewDone ? freeStateOf(idx, now) : "idle";
         play(S.work, state === "work" && !reduce); play(S.idle, state === "idle" && !reduce); if (S.ask) play(S.ask, state === "ask" && !reduce);
         var map = state === "minute" ? S.minute.still : (S[state].ready && !reduce ? S[state].vtex : S[state].poster);
         var alpha = state === "minute" ? S.minute.alpha : S[state].alpha;
         if (m.map !== map || m.alphaMap !== alpha){ m.map = map; m.alphaMap = alpha; m.needsUpdate = true; }
-        var litGoal = state === "idle" && focused !== idx ? SLEEP_DIM : 1;   // the room you zoomed into is always fully lit
+        var litGoal = state === "idle" && focused !== idx && !crewDone ? SLEEP_DIM : 1;   // the room you zoomed into is always fully lit
         lit = reduce ? litGoal : lit + (litGoal - lit) * 0.05; m.color.setScalar(lit);
       };
     }
@@ -1399,7 +1406,7 @@
     return { resize: function(){ resize(); if (focused < 0) overviewGoal(); }, turn: function(dir){ if (focused >= 0 && !VIDEO_ROOM[focused]) azGoal += dir * Math.PI / 2; }, isVideo: function(i){ return !!VIDEO_ROOM[i]; }, focus: focus, onPick: function(fn){ onPick = fn; },
              setActive: setActive,
              redrawTags: function(){ CREW.forEach(function(a, i){ tags[i].material.map = nameTex(a, tagState[i]); tags[i].material.needsUpdate = true; }); },
-             setStatus: function(arr){ CREW.forEach(function(a, i){ var st = arr ? arr[i] : null; if (tagState[i] === st) return; tagState[i] = st;
+             setStatus: function(arr){ crewDone = !!arr && arr.every(function(x){ return x === "done"; }); if (!crewDone){ freeUntil = {}; } CREW.forEach(function(a, i){ var st = arr ? arr[i] : null; if (tagState[i] === st) return; tagState[i] = st;
                tags[i].material.map = nameTex(a, st); tags[i].material.needsUpdate = true; }); },
              setInset: function(px){ inset = px; if (focused < 0) overviewGoal(); } };
   }
